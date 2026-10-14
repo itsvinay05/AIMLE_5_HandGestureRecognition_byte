@@ -10,6 +10,13 @@
 
 ---
 
+## 📖 About
+1. **Real-Time 10-Gesture AI**: Detects and classifies 10 distinct hand signs and gestures in real time with an evaluated 96.4% test accuracy.
+2. **Hybrid Deep Learning Pipeline**: Combines an offline Python TensorFlow/Keras CNN training workflow with client-side MediaPipe 3D hand landmark tracking.
+3. **Zero-Latency Vercel Deployment**: Hosted globally on Vercel with zero server cost and zero cold starts, delivering smooth 30+ FPS webcam interaction.
+
+---
+
 ## 📌 Project Overview
 **AIMLE_5_HandGestureRecognition_byte** is a real-time deep learning hand gesture recognition system. It features:
 1. **Offline Training & Evaluation (Python)**: Convolutional Neural Network (CNN) pipeline built with TensorFlow/Keras and scikit-learn to classify hand gesture images into structured classes with complete held-out evaluation metrics and confusion matrix generation.
