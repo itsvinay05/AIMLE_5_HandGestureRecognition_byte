@@ -1,0 +1,16 @@
+{
+  "name": "hand-gesture-recognition-web",
+  "version": "1.0.0",
+  "description": "Real-time Hand Gesture Recognition Web Application deployed on Vercel",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "hand-gesture-recognition",
+    "tensorflow-js",
+    "deep-learning",
+    "vercel"
+  ],
+  "author": "",
+  "license": "MIT"
+}

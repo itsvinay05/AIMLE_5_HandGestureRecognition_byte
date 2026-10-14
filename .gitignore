@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.ipynb_checkpoints/
+
+# Dataset files (large files)
+dataset/
+
+# OS specific
+.DS_Store
+Thumbs.db

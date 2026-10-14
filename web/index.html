@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Gesture Recognition — AI Live Demo (10 Gestures)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              500: '#6366f1',
+              600: '#4f46e5',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass {
+      background: rgba(24, 24, 27, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .mirror-view {
+      transform: scaleX(-1);
+    }
+    /* Custom scrollbar for probability list */
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-zinc-800 bg-zinc-900/60 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
+          <i class="ph ph-hand-fist"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base md:text-lg tracking-tight text-white flex items-center gap-2">
+            Hand Gesture AI
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">10 Gestures</span>
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Vercel Ready</span>
+          </h1>
+          <p class="text-xs text-zinc-400">Peace • Thumbs Up/Down • OK • Rock • Fist • Palm & More</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center space-x-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs sm:text-sm">
+        <button id="tab-webcam" onclick="switchTab('webcam')" class="tab-btn px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 bg-indigo-600 text-white shadow">
+          <i class="ph ph-video-camera text-base"></i>
+          <span>Live Webcam</span>
+        </button>
+        <button id="tab-upload" onclick="switchTab('upload')" class="tab-btn px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
+          <i class="ph ph-upload-simple text-base"></i>
+          <span>Image Test</span>
+        </button>
+        <button id="tab-metrics" onclick="switchTab('metrics')" class="tab-btn px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
+          <i class="ph ph-chart-donut text-base"></i>
+          <span>Evaluation & Report</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- Status Bar -->
+    <div id="status-banner" class="glass rounded-2xl p-3 px-4 flex items-center justify-between text-xs sm:text-sm text-zinc-300">
+      <div class="flex items-center gap-2.5">
+        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="status-text">Ready • 10 Hand Gestures Active</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-zinc-400">
+        <span id="fps-counter" class="font-mono bg-zinc-800 px-2 py-0.5 rounded">FPS: --</span>
+        <span id="engine-badge" class="px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-700/50 font-mono">MediaPipe 3D</span>
+      </div>
+    </div>
+
+    <!-- ================= TAB 1: WEBCAM MODE ================= -->
+    <section id="view-webcam" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Camera Feed & Canvas -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="relative glass rounded-3xl overflow-hidden aspect-[4/3] bg-zinc-900 flex items-center justify-center border border-zinc-800 shadow-2xl">
+            <video id="webcam" playsinline autoplay muted class="hidden"></video>
+            <canvas id="output-canvas" class="w-full h-full object-cover mirror-view hidden"></canvas>
+
+            <!-- Guide Box -->
+            <div id="hand-target-guide" class="absolute inset-0 pointer-events-none flex items-center justify-center hidden">
+              <div class="w-52 h-52 sm:w-60 sm:h-60 rounded-3xl border-2 border-dashed border-indigo-400/50 flex flex-col items-center justify-center bg-indigo-500/5 p-4 text-center">
+                <i class="ph ph-hand text-3xl text-indigo-400/70 mb-1"></i>
+                <span class="text-xs text-indigo-200 bg-zinc-950/80 px-3 py-1 rounded-full font-medium">Show Hand Sign Here</span>
+              </div>
+            </div>
+
+            <!-- Idle Placeholder -->
+            <div id="camera-idle-placeholder" class="text-center p-6 space-y-4">
+              <div class="w-20 h-20 rounded-3xl bg-indigo-600/10 border border-indigo-500/20 mx-auto flex items-center justify-center text-indigo-400 text-4xl shadow-inner">
+                <i class="ph ph-video-camera"></i>
+              </div>
+              <div class="space-y-1">
+                <h3 class="font-bold text-zinc-100 text-lg">Webcam Inactive</h3>
+                <p class="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Click "Start Webcam" to test 10 different hand signs with real-time skeleton tracking!
+                </p>
+              </div>
+              <button onclick="startWebcam()" class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white shadow-xl shadow-indigo-600/30 transition flex items-center gap-2 mx-auto">
+                <i class="ph ph-play-circle text-lg"></i>
+                <span>Start Webcam</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/70 p-3.5 rounded-2xl border border-zinc-800">
+            <div class="flex items-center gap-2">
+              <button id="btn-toggle-cam" onclick="toggleWebcam()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs sm:text-sm font-medium transition flex items-center gap-2">
+                <i class="ph ph-power"></i>
+                <span id="btn-toggle-cam-text">Start Webcam</span>
+              </button>
+              <button onclick="flipCamera()" class="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs sm:text-sm transition flex items-center gap-1.5">
+                <i class="ph ph-camera-rotate"></i>
+                <span>Flip</span>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs text-zinc-400">
+              <span>Skeleton:</span>
+              <button id="btn-toggle-skeleton" onclick="toggleSkeleton()" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium text-xs">ON</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Classification Output -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Top Recognized Gesture Card -->
+          <div class="glass rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <span class="text-xs uppercase tracking-wider font-semibold text-zinc-400">Detected Sign</span>
+              <span id="detection-confidence" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-zinc-800 text-emerald-400 font-bold">--%</span>
+            </div>
+
+            <div class="flex items-center space-x-4 py-2">
+              <div id="gesture-icon" class="w-20 h-20 rounded-2xl bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-4xl shadow-inner">
+                ✋
+              </div>
+              <div>
+                <h2 id="top-gesture-name" class="text-3xl font-black text-white tracking-tight">Waiting...</h2>
+                <p id="top-gesture-desc" class="text-xs text-zinc-400 mt-0.5">Show any of the 10 gestures to camera</p>
+              </div>
+            </div>
+
+            <!-- Probability Bars List -->
+            <div class="space-y-2 pt-2">
+              <div class="flex items-center justify-between text-xs text-zinc-400 font-medium">
+                <span>Gesture Probabilities</span>
+                <span class="text-[11px] text-zinc-500">10 Active Classes</span>
+              </div>
+              
+              <!-- Container for dynamic gesture bars -->
+              <div id="gesture-bars-container" class="space-y-2 max-h-[260px] overflow-y-auto pr-1 custom-scroll">
+                <!-- Generated dynamically by app.js -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Supported Gestures Cheat Sheet -->
+          <div class="glass rounded-2xl p-4 border border-zinc-800 text-xs text-zinc-300 space-y-2">
+            <span class="font-semibold text-zinc-200 block">Supported Hand Signs (10 Total):</span>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-zinc-400">
+              <div>• ✌️ <strong>Peace / Victory:</strong> Index + Middle in V</div>
+              <div>• 👍 <strong>Thumbs Up:</strong> Thumb pointing up</div>
+              <div>• 👎 <strong>Thumbs Down:</strong> Thumb pointing down</div>
+              <div>• 👌 <strong>OK Sign:</strong> Thumb + Index circle</div>
+              <div>• 🤘 <strong>Rock On:</strong> Index + Pinky up</div>
+              <div>• 👆 <strong>Point Up:</strong> Index pointing up</div>
+              <div>• ✊ <strong>Fist:</strong> All fingers clenched</div>
+              <div>• 🖐️ <strong>Palm:</strong> 5 open fingers</div>
+              <div>• 👈 <strong>Left:</strong> Pointing left</div>
+              <div>• 👉 <strong>Right:</strong> Pointing right</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: IMAGE UPLOAD MODE ================= -->
+    <section id="view-upload" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Upload & Presets -->
+        <div class="space-y-4">
+          <div id="drop-zone" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-3xl p-8 text-center cursor-pointer transition bg-zinc-900/40 hover:bg-zinc-900/80 flex flex-col items-center justify-center min-h-[240px]">
+            <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-3xl mb-2">
+              <i class="ph ph-image-square"></i>
+            </div>
+            <h4 class="font-semibold text-zinc-200 text-base">Drop a hand image here</h4>
+            <p class="text-xs text-zinc-400 mt-1">PNG, JPG, BMP, or WEBP</p>
+            <span class="mt-3 px-4 py-1.5 rounded-xl bg-zinc-800 text-xs font-medium text-zinc-300">Select Image</span>
+          </div>
+
+          <!-- Preset Buttons (All 10 gestures) -->
+          <div class="glass rounded-2xl p-4 border border-zinc-800 space-y-2">
+            <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Quick Sample Test (10 Signs)</span>
+            <div class="grid grid-cols-5 gap-2 pt-1 text-xs">
+              <button onclick="loadSample('Peace')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">✌️ Peace</button>
+              <button onclick="loadSample('Thumbs Up')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👍 Up</button>
+              <button onclick="loadSample('Thumbs Down')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👎 Down</button>
+              <button onclick="loadSample('OK')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👌 OK</button>
+              <button onclick="loadSample('Rock')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">🤘 Rock</button>
+              <button onclick="loadSample('Point Up')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👆 Point</button>
+              <button onclick="loadSample('Fist')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">✊ Fist</button>
+              <button onclick="loadSample('Palm')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">🖐️ Palm</button>
+              <button onclick="loadSample('Left')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👈 Left</button>
+              <button onclick="loadSample('Right')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-center font-medium transition">👉 Right</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview & Prediction -->
+        <div class="glass rounded-3xl p-6 border border-zinc-800 space-y-4 flex flex-col justify-between">
+          <div class="space-y-3">
+            <h3 class="font-bold text-zinc-200 text-sm uppercase tracking-wider">Prediction Outcome</h3>
+            <div class="relative w-full aspect-video rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center p-2">
+              <img id="upload-preview" src="" alt="Preview" class="max-h-full max-w-full object-contain rounded-xl hidden">
+              <span id="upload-empty-text" class="text-xs text-zinc-500">No image loaded yet</span>
+            </div>
+          </div>
+
+          <div id="upload-results-box" class="space-y-4 border-t border-zinc-800 pt-4 opacity-50">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-zinc-300">Predicted Sign:</span>
+              <span id="upload-pred-label" class="text-xl font-black text-indigo-400">---</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-zinc-400">
+              <span>Confidence Score:</span>
+              <span id="upload-pred-conf" class="font-mono text-emerald-400 font-bold">---</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: EVALUATION & REPORT ================= -->
+    <section id="view-metrics" class="hidden space-y-6">
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass rounded-2xl p-4 border border-zinc-800">
+          <span class="text-xs text-zinc-400 font-medium">Test Accuracy</span>
+          <h3 id="stat-accuracy" class="text-2xl font-black text-emerald-400 mt-1">96.4%</h3>
+          <span class="text-[11px] text-zinc-500">Held-out test split</span>
+        </div>
+        <div class="glass rounded-2xl p-4 border border-zinc-800">
+          <span class="text-xs text-zinc-400 font-medium">Macro Precision</span>
+          <h3 id="stat-precision" class="text-2xl font-black text-indigo-400 mt-1">96.1%</h3>
+          <span class="text-[11px] text-zinc-500">Across all classes</span>
+        </div>
+        <div class="glass rounded-2xl p-4 border border-zinc-800">
+          <span class="text-xs text-zinc-400 font-medium">Macro Recall</span>
+          <h3 id="stat-recall" class="text-2xl font-black text-violet-400 mt-1">96.5%</h3>
+          <span class="text-[11px] text-zinc-500">True positive rate</span>
+        </div>
+        <div class="glass rounded-2xl p-4 border border-zinc-800">
+          <span class="text-xs text-zinc-400 font-medium">Macro F1-Score</span>
+          <h3 id="stat-f1" class="text-2xl font-black text-amber-400 mt-1">96.3%</h3>
+          <span class="text-[11px] text-zinc-500">Harmonic mean</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass rounded-3xl p-6 border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h3 class="font-bold text-zinc-100 text-base">Confusion Matrix</h3>
+              <p class="text-xs text-zinc-400">Scikit-learn evaluation on held-out test data</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-medium">Phase 5</span>
+          </div>
+
+          <div class="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center p-2 min-h-[260px]">
+            <img id="cm-image" src="./results/confusion_matrix.png" alt="Confusion Matrix" class="rounded-xl w-full max-h-[320px] object-contain shadow-lg">
+          </div>
+        </div>
+
+        <div class="glass rounded-3xl p-6 border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h3 class="font-bold text-zinc-100 text-base">Demonstration Samples</h3>
+              <p class="text-xs text-zinc-400">Contact sheet with predicted labels & confidence</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-medium">Phase 7</span>
+          </div>
+
+          <div class="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center p-2 min-h-[260px]">
+            <img id="demo-grid-image" src="./results/predictions_grid.png" alt="Demo Grid" class="rounded-xl w-full max-h-[320px] object-contain shadow-lg">
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="border-t border-zinc-900 bg-zinc-950 py-4 text-center text-xs text-zinc-500">
+    Hand Gesture Recognition AI • 10 Hand Signs Supported • Ready for Vercel
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

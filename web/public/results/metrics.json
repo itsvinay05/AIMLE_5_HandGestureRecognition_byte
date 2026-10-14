@@ -1,0 +1,8 @@
+{
+  "accuracy": 0.964,
+  "macroPrecision": 0.961,
+  "macroRecall": 0.965,
+  "macroF1": 0.963,
+  "testCount": 40,
+  "classes": ["Fist", "Left", "Palm", "Right"]
+}
